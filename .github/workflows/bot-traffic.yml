@@ -150,7 +150,7 @@ jobs:
         run: python main_part1.py
  
       - name: Run bot traffic (Part 2 - Carts & Checkouts)
-        if: github.event.schedule == '0 8 * * *'
+        if: github.event.schedule == '0 8 * * *' || github.event_name == 'workflow_dispatch'
         run: python main_part2.py
  
       - name: Run bot traffic (App Wrapper - Capacitor/Android)
