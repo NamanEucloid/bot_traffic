@@ -146,15 +146,15 @@ jobs:
       # DYNAMIC EXECUTION: Routes to Part 1, Part 2, or App based on time
       # ---------------------------------------------------------
       - name: Run bot traffic (Part 1 - Bounces & Discovery)
-        if: github.event.schedule == '0 4 * * *'
+        if: github.event.schedule == '0 1 * * *'
         run: python main_part1.py
  
       - name: Run bot traffic (Part 2 - Carts & Checkouts)
-        if: github.event.schedule == '0 8 * * *' || github.event_name == 'workflow_dispatch'
+        if: github.event.schedule == '0 5 * * *'
         run: python main_part2.py
  
       - name: Run bot traffic (App Wrapper - Capacitor/Android)
-        if: github.event.schedule == '0 12 * * *' || github.event_name == 'workflow_dispatch'
+        if: github.event.schedule == '0 9 * * *' || github.event_name == 'workflow_dispatch'
         env:
           TRAFFIC_TYPE: app
         run: python main_app.py
