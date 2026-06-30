@@ -1,18 +1,19 @@
 name: Bot Traffic CDP Runner
-
+ 
 on:
   schedule:
-    - cron: "0 4 * * *"  # Runs Part 1 at 4:00 AM UTC
-    - cron: "0 8 * * *"  # Runs Part 2 at 8:00 AM UTC (4 hours later)
+    - cron: "0 1 * * *"  # Runs Part 1 at 1:00 AM UTC
+    - cron: "0 5 * * *"  # Runs Part 2 at 5:00 AM UTC (4 hours later)
+    - cron: "0 9 * * *" # Runs App Traffic at 9:00 AM UTC
   workflow_dispatch:
-
+ 
 permissions:
   contents: write
-
+ 
 concurrency:
   group: bot-traffic-cdp
   cancel-in-progress: false
-
+ 
 jobs:
   run-bot-traffic:
     name: Run bot traffic through Chrome CDP
@@ -29,24 +30,24 @@ jobs:
       PYTHONUNBUFFERED: "1"
       PYTHONPATH: ${{ github.workspace }}
       PIP_DISABLE_PIP_VERSION_CHECK: "1"
-
+ 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: main # Automatically pulls the absolute latest commit at execution time
-
+ 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
           cache: pip
-
+ 
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-
+ 
       - name: Install Google Chrome Stable
         shell: bash
         run: |
@@ -58,7 +59,7 @@ jobs:
           echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list > /dev/null
           sudo apt-get update
           sudo apt-get install -y google-chrome-stable
-
+ 
       - name: Configure browser user agent
         shell: bash
         run: |
@@ -66,7 +67,7 @@ jobs:
           chrome_version="$(google-chrome-stable --version | awk '{print $3}')"
           chrome_major="${chrome_version%%.*}"
           echo "BOT_USER_AGENT=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chrome_major}.0.0.0 Safari/537.36" >> "${GITHUB_ENV}"
-
+ 
       - name: Start virtual display
         shell: bash
         run: |
@@ -74,7 +75,7 @@ jobs:
           Xvfb "${DISPLAY}" -screen 0 1920x1080x24 -ac -nolisten tcp > "${RUNNER_TEMP}/xvfb.log" 2>&1 &
           echo "$!" > "${RUNNER_TEMP}/xvfb.pid"
           sleep 2
-
+ 
       - name: Start Chrome with CDP enabled
         shell: bash
         run: |
@@ -106,7 +107,7 @@ jobs:
             sleep 1
           done
           exit 1
-
+ 
       - name: Verify analytics endpoints are reachable
         shell: bash
         run: |
@@ -124,7 +125,7 @@ jobs:
               exit 1
             fi
           done
-
+ 
       - name: Verify target site is reachable
         shell: bash
         run: |
@@ -134,25 +135,31 @@ jobs:
           if [ "${code}" = "000" ]; then
             exit 1
           fi
-
+ 
       - name: Ensure SQLite storage exists
         run: python -c "from database import create_tables; create_tables()"
-
+ 
       - name: Probe analytics through Chrome CDP
         run: python scripts/analytics_cdp_probe.py --output analytics-probe.json --screenshot analytics-probe.png --strict
-
+ 
       # ---------------------------------------------------------
-      # DYNAMIC EXECUTION: Routes to Part 1 or Part 2 based on time
+      # DYNAMIC EXECUTION: Routes to Part 1, Part 2, or App based on time
       # ---------------------------------------------------------
       - name: Run bot traffic (Part 1 - Bounces & Discovery)
-        if: github.event.schedule == '0 4 * * *' || github.event_name == 'workflow_dispatch'
+        if: github.event.schedule == '0 4 * * *'
         run: python main_part1.py
-
+ 
       - name: Run bot traffic (Part 2 - Carts & Checkouts)
         if: github.event.schedule == '0 8 * * *'
         run: python main_part2.py
+ 
+      - name: Run bot traffic (App Wrapper - Capacitor/Android)
+        if: github.event.schedule == '0 12 * * *' || github.event_name == 'workflow_dispatch'
+        env:
+          TRAFFIC_TYPE: app
+        run: python main_app.py
       # ---------------------------------------------------------
-
+ 
       - name: Commit updated user database
         if: success()
         run: |
@@ -162,7 +169,7 @@ jobs:
           git add storage/bot_users.db
           git diff --cached --quiet || git commit -m "chore: update bot_users.db [skip ci]"
           git push
-
+ 
       - name: Stop Chrome
         if: always()
         shell: bash
@@ -173,7 +180,7 @@ jobs:
           if [ -f "${RUNNER_TEMP}/xvfb.pid" ]; then
             kill "$(cat "${RUNNER_TEMP}/xvfb.pid")" 2>/dev/null || true
           fi
-
+ 
       - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -189,3 +196,5 @@ jobs:
             login_failure.png
           if-no-files-found: ignore
           retention-days: 7
+ 
+ 
