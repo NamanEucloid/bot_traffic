@@ -91,7 +91,7 @@ def generate_user_flows():
         if guest_bots < 0:
             returning_bots += guest_bots
             guest_bots = 0
-           
+            
         user_types = (
             ["returning_logged_in"] * returning_bots +
             ["new_signup"] * signup_bots +
